@@ -421,8 +421,8 @@ function hitBall(res) {
     foul: { t: '擦棒…', fill: '#cfd6e4', size: 54 },
   }[res.tier]
   spawnFloater(p, 0.8, tierFx.t, { fill: tierFx.fill, size: tierFx.size, life: 1.0, rise: 2.2, grow: 0.7, worldScale: 2.6 })
-  // Ball-Cam 追球（擦棒不追）
-  if (res.tier !== 'foul') game.ballcam = true
+  // Ball-Cam 追球（擦棒不追；設定可改為鏡頭留在原地）
+  if (res.tier !== 'foul' && settings.ballcam) game.ballcam = true
   game.phase = 'resolve'; game.phaseT = 0
 }
 
@@ -835,7 +835,7 @@ function hintOnSwing() {
 //  設定（靈敏度 / 音量 / FOV / 震動）
 // ============================================================
 const SETTINGS_KEY = 'angrybb:settings'
-const SETTINGS_DEFAULTS = { sens: 1.0, sfxVol: 50, musVol: 50, fov: 72, shake: true }
+const SETTINGS_DEFAULTS = { sens: 1.0, sfxVol: 50, musVol: 50, fov: 72, shake: true, ballcam: true }   // ballcam：擊球後鏡頭跟著球；關閉＝留在打擊區
 const settings = { ...SETTINGS_DEFAULTS }
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}) } catch {}
 function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)) } catch {} }
@@ -1213,12 +1213,14 @@ const setSfx = document.getElementById('set-sfx'), setSfxV = document.getElement
 const setMus = document.getElementById('set-mus'), setMusV = document.getElementById('set-mus-v')
 const setFov = document.getElementById('set-fov'), setFovV = document.getElementById('set-fov-v')
 const setShakeBtn = document.getElementById('set-shake')
+const setBallcamBtn = document.getElementById('set-ballcam')
 function syncSettingsUI() {
   setSens.value = settings.sens; setSensV.textContent = settings.sens.toFixed(1) + '×'
   setSfx.value = settings.sfxVol; setSfxV.textContent = settings.sfxVol + '%'
   setMus.value = settings.musVol; setMusV.textContent = settings.musVol + '%'
   setFov.value = settings.fov; setFovV.textContent = settings.fov + '°'
   setShakeBtn.textContent = settings.shake ? '開' : '關'; setShakeBtn.classList.toggle('on', settings.shake)
+  setBallcamBtn.textContent = settings.ballcam ? '跟著球' : '留在原地'; setBallcamBtn.classList.toggle('on', settings.ballcam)
 }
 function openSettings() { syncSettingsUI(); settingsModal.classList.remove('hidden') }
 document.getElementById('settings-btn-landing').addEventListener('click', openSettings)
@@ -1228,6 +1230,7 @@ setSfx.addEventListener('input', () => { settings.sfxVol = +setSfx.value; setSfx
 setMus.addEventListener('input', () => { settings.musVol = +setMus.value; setMusV.textContent = settings.musVol + '%'; setMusicVolume(settings.musVol / 100); saveSettings() })
 setFov.addEventListener('input', () => { settings.fov = +setFov.value; setFovV.textContent = settings.fov + '°'; resize(); saveSettings() })
 setShakeBtn.addEventListener('click', () => { settings.shake = !settings.shake; setShakeBtn.textContent = settings.shake ? '開' : '關'; setShakeBtn.classList.toggle('on', settings.shake); saveSettings() })
+setBallcamBtn.addEventListener('click', () => { settings.ballcam = !settings.ballcam; syncSettingsUI(); saveSettings() })
 document.getElementById('set-reset').addEventListener('click', () => {
   Object.assign(settings, SETTINGS_DEFAULTS)
   saveSettings(); applySettings(); syncSettingsUI()
