@@ -1220,8 +1220,20 @@ for (const btn of document.querySelectorAll('.mclose[data-close]')) {
 }
 const settingsModal = document.getElementById('settings-modal')
 const onlineModal = document.getElementById('online-modal')
-for (const m of [msgModal, onlineModal, shopModal, settingsModal]) m.addEventListener('click', (e) => {
+const debugModal = document.getElementById('debug-modal')
+for (const m of [msgModal, onlineModal, shopModal, settingsModal, debugModal]) m.addEventListener('click', (e) => {
   if (e.target === m) m.classList.add('hidden')
+})
+// ---- Debug 選單（測試用）----
+function renderDebug() {
+  const el = document.getElementById('debug-wallet')
+  if (el) el.textContent = wallet.toLocaleString()
+}
+document.getElementById('debug-open').addEventListener('click', () => { renderDebug(); debugModal.classList.remove('hidden') })
+document.getElementById('debug-coins').addEventListener('click', () => {
+  wallet += 10000; saveWallet()
+  sfx.coin()
+  renderDebug(); refreshHUD()
 })
 // 設定選單
 const setSens = document.getElementById('set-sens'), setSensV = document.getElementById('set-sens-v')

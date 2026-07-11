@@ -303,6 +303,11 @@
     .set-reset { margin-top: 4px; align-self: center; padding: 9px 20px; font-size: 14px; font-weight: 800;
       border-radius: 999px; background: #efe6d0; color: #7a5a34; box-shadow: none; }
     .set-reset:hover { background: #e6d8b8; }
+    /* Debug 選單 */
+    .debug-wallet { text-align: center; font-size: 15px; font-weight: 700; color: #444; }
+    .debug-wallet b { color: #f4a53a; font-size: 20px; }
+    #debug-coins { align-self: center; background: #f4b93a; color: #5a3d10; }
+    #debug-coins:hover { background: #ffca52; }
 
     /* 新手動態提示 */
     #hint { position: fixed; left: 50%; bottom: 24%; transform: translate(-50%, 8px); z-index: 6;
@@ -453,6 +458,18 @@
         <label class="set-row"><span>🎥 擊球鏡頭</span><button id="set-ballcam" class="set-toggle"></button></label>
         <label class="set-row"><span>📳 畫面震動</span><button id="set-shake" class="set-toggle"></button></label>
         <button id="set-reset" class="set-reset">↺ 回到預設值</button>
+        <button id="debug-open" class="set-reset">🐞 Debug 選單</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Debug 選單（測試用工具） -->
+  <div id="debug-modal" class="modal hidden">
+    <div class="lb-card">
+      <div class="lb-head"><span>🐞 Debug</span><button class="mclose" data-close="debug-modal">✕</button></div>
+      <div class="set-body">
+        <div class="debug-wallet">目前金幣：<b id="debug-wallet">0</b></div>
+        <button id="debug-coins">💰 領取 10,000 金幣</button>
       </div>
     </div>
   </div>
