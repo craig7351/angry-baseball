@@ -1,0 +1,22 @@
+{
+  "name": "angry-baseball",
+  "version": "1.0.0",
+  "description": "第一人稱 3D 憤怒棒球 — three.js 渲染 + cannon-es 物理的打擊遊戲",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "db:init": "wrangler d1 execute angry-baseball-db --file=./schema.sql --remote",
+    "deploy": "vite build && wrangler pages deploy dist --project-name=angry-baseball --commit-dirty=true"
+  },
+  "dependencies": {
+    "cannon-es": "^0.20.0",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.3.0",
+    "vite": "^5.4.0",
+    "wrangler": "^4"
+  }
+}

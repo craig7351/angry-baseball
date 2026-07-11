@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Cloudflare Pages 設定：靜態站（dist）+ Pages Functions（functions/api/*）
+  // 部署前：wrangler d1 create angry-baseball-db → 把 database_id 填進來 → npm run db:init → npm run deploy
+  "name": "angry-baseball",
+  "compatibility_date": "2025-06-01",
+  "pages_build_output_dir": "./dist",
+  // 全球排行榜用 D1（functions/api/* 透過 env.DB 存取）
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "angry-baseball-db",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+    }
+  ]
+}

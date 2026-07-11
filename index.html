@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>憤怒棒球 Angry Baseball</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: #6db8e8; }
+    body { font-family: "Segoe UI", "Microsoft JhengHei", system-ui, sans-serif; }
+    #game { position: fixed; top: 0; left: 0; display: block; touch-action: none; }
+
+    /* 手機虛擬搖桿 + 揮棒鈕 */
+    #touch-controls { display: none; }
+    #touch-controls.show { display: block; }
+    #joystick { position: fixed; left: 24px; bottom: 24px; width: 120px; height: 120px; border-radius: 50%;
+      background: rgba(255,255,255,.14); border: 2px solid rgba(255,255,255,.4); z-index: 7; touch-action: none; }
+    #joy-knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; border-radius: 50%;
+      background: rgba(255,255,255,.6); transform: translate(-50%,-50%); box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+    #swing-btn { position: fixed; right: 26px; bottom: 32px; width: 104px; height: 104px; border-radius: 50%;
+      z-index: 7; touch-action: none; padding: 0; line-height: 1.1; font-size: 18px; font-weight: 800; color: #fff;
+      background: rgba(224,83,59,.9); border: 3px solid rgba(255,255,255,.55); box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+    #swing-btn:active { background: rgba(200,60,40,.98); transform: scale(.95); }
+    #pause-btn { position: fixed; top: 12px; right: 12px; z-index: 7; width: 44px; height: 44px; border-radius: 50%;
+      padding: 0; font-size: 20px; color: #fff; background: rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.45);
+      box-shadow: none; }
+    #pause-btn:active { background: rgba(0,0,0,.6); }
+
+    /* 準星 */
+    #crosshair {
+      position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: 22px; height: 22px; pointer-events: none; z-index: 4;
+    }
+    #crosshair::before, #crosshair::after {
+      content: ''; position: absolute; background: #fff;
+      box-shadow: 0 0 0 1px rgba(0,0,0,.85), 0 0 4px rgba(0,0,0,.6);
+    }
+    #crosshair::before { left: 50%; top: 0; width: 3px; height: 100%; transform: translateX(-50%); }
+    #crosshair::after { top: 50%; left: 0; height: 3px; width: 100%; transform: translateY(-50%); }
+
+    /* HUD */
+    #hud {
+      position: fixed; top: 0; left: 0; right: 0; padding: 12px 16px;
+      display: flex; align-items: center; gap: 22px; pointer-events: none;
+      color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,.6), 0 0 3px rgba(0,0,0,.4); z-index: 5;
+      background: linear-gradient(rgba(0,0,0,.32), rgba(0,0,0,0));
+    }
+    .stat { display: flex; flex-direction: column; gap: 2px; white-space: nowrap; }
+    .stat .k { font-size: 11px; letter-spacing: 1px; opacity: .85; }
+    .stat .v { font-size: 22px; font-weight: 800; line-height: 1; }
+    @media (max-width: 560px) {
+      #hud { gap: 12px; padding: 9px 12px; }
+      .stat .k { font-size: 10px; }
+      .stat .v { font-size: 16px; }
+    }
+
+    /* 投球資訊（球種 / 球速） */
+    #pitch-label { position: fixed; top: 72px; left: 50%; transform: translateX(-50%);
+      z-index: 5; pointer-events: none; color: #fff; font-weight: 900; font-size: 20px;
+      text-shadow: 0 2px 8px rgba(0,0,0,.6); opacity: 0; transition: opacity .2s; }
+    #pitch-label.show { opacity: 1; }
+
+    /* 中央橫幅（全壘打） */
+    #banner { position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%);
+      z-index: 6; pointer-events: none; text-align: center; color: #fff; }
+    #banner.hidden { display: none; }
+    #banner .wb-title { font-size: 52px; font-weight: 900; letter-spacing: 2px; text-shadow: 0 3px 14px rgba(0,0,0,.6); }
+    #banner.boss .wb-title { color: #ffd24a; }
+    #banner .wb-sub { font-size: 22px; font-weight: 800; color: #ffe27a; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+    #banner.show { animation: bannerAni 2.0s ease-out forwards; }
+    @keyframes bannerAni {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); }
+      12% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      75% { opacity: 1; }
+      100% { opacity: 0; transform: translate(-50%, -62%) scale(1); }
+    }
+
+    /* 大字距離（刷新本場最遠） */
+    #dist-big {
+      position: fixed; inset: 0; z-index: 6; pointer-events: none;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      padding-top: 44vh; gap: 2px; text-align: center;
+    }
+    #dist-big.hidden { display: none; }
+    #dist-big .fb-cap { font-size: clamp(13px, 2.2vw, 22px); font-weight: 800; letter-spacing: 5px;
+      color: rgba(255,226,122,.72); text-shadow: 0 2px 8px rgba(0,0,0,.5); }
+    #dist-big .fb-num { font-size: clamp(56px, 14vw, 140px); font-weight: 900; line-height: 1;
+      color: rgba(255,255,255,.55); -webkit-text-stroke: 1.5px rgba(0,0,0,.16);
+      text-shadow: 0 4px 16px rgba(0,0,0,.32); font-variant-numeric: tabular-nums; }
+    #dist-big .fb-unit { font-size: .4em; font-weight: 800; margin-left: .12em; color: rgba(159,230,255,.62); -webkit-text-stroke: 0; }
+    #dist-big.pop { animation: fbPop .18s ease-out; }
+    @keyframes fbPop { 0% { transform: scale(1); } 50% { transform: scale(1.06); } 100% { transform: scale(1); } }
+
+    /* 覆蓋層 */
+    #overlay, #msg, #pause {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px; background: rgba(0,0,0,.5); z-index: 10; color: #fff;
+    }
+    #overlay.hidden, #msg.hidden, #pause.hidden { display: none; }
+    #pause-hint { position: fixed; right: 14px; bottom: 14px; z-index: 6; pointer-events: none;
+      font-size: 12px; font-weight: 700; color: #fff; background: rgba(0,0,0,.35);
+      padding: 6px 12px; border-radius: 999px; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+    #pause-hint.hidden { display: none; }
+    .box { background: #fff; color: #222; border-radius: 18px; padding: 30px 42px; text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,.4); max-width: 480px; }
+
+    /* 選單（球場計分板風） */
+    .menu { background: #14351f; color: #d7e8dc; border: 5px solid #2e6b40; border-radius: 24px;
+      padding: 24px 26px; text-align: center; box-shadow: 0 0 0 4px #0d2314, 0 22px 50px rgba(0,0,0,.45);
+      width: min(94vw, 640px); max-height: 92vh; overflow-y: auto; }
+    .menu h2 { font-size: 26px; color: #ffe27a; margin-bottom: 8px; }
+    .menu .howto { font-size: 12px; color: #9fc4aa; line-height: 1.9; margin-bottom: 14px; }
+    .menu .howto kbd { background: #23543a; color: #d7e8dc; border-radius: 5px; padding: 1px 6px; }
+    .mode-row { display: flex; gap: 12px; margin-bottom: 18px; }
+    .mode-card { flex: 1; display: flex; flex-direction: column; gap: 4px; align-items: center;
+      padding: 16px 8px; border-radius: 16px; color: #fff; cursor: pointer; border: none;
+      font-weight: 900; box-shadow: 0 5px 0 rgba(0,0,0,.3); transition: transform .1s, filter .1s; }
+    .mode-card .big { font-size: 20px; }
+    .mode-card small { font-size: 11px; font-weight: 700; opacity: .92; }
+    .mode-card:hover { filter: brightness(1.08); }
+    .mode-card:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,.3); }
+    #derby-btn { background: linear-gradient(#ff9a3d, #ff6a00); }
+    #survival-btn { background: linear-gradient(#e85466, #c11f2b); }
+    .menu h3 { font-size: 16px; color: #ffe27a; margin: 6px 0 10px; }
+    #level-list { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+    @media (max-width: 600px) { #level-list { grid-template-columns: repeat(4, 1fr); gap: 8px; } }
+    .level-card { display: flex; flex-direction: column; align-items: center; gap: 3px;
+      padding: 10px 4px; border-radius: 14px; background: #1d4a2c; border: 2px solid #2e6b40;
+      box-shadow: 0 3px 0 #0d2314; cursor: pointer; transition: transform .12s; color: #d7e8dc; }
+    .level-card:hover:not(.locked) { transform: translateY(-2px); background: #245a36; }
+    .level-card.locked { cursor: not-allowed; opacity: .45; }
+    .level-card .lv-num { font-size: 20px; font-weight: 800; color: #ffe27a; line-height: 1; }
+    .level-card.locked .lv-num { color: #6c8a76; }
+    .level-card .lv-name { font-size: 11px; font-weight: 700; }
+    .level-card .lv-stars .cs { font-size: 13px; color: #336042; }
+    .level-card .lv-stars .cs.on { color: #ffc32b; }
+    .menu-actions { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+    #who { font-size: 13px; font-weight: 700; color: #9fc4aa; }
+    #who b { color: #ffe27a; }
+    #to-home, #shop-btn-menu { background: #23543a; color: #d7e8dc; box-shadow: 0 4px 0 rgba(0,0,0,.25); font-weight: 900;
+      border-radius: 16px; }
+    #to-home:hover, #shop-btn-menu:hover { background: #2c684a; }
+
+    .box h2 { font-size: 26px; margin-bottom: 10px; }
+    .box p { font-size: 14px; color: #555; line-height: 1.7; margin-bottom: 18px; }
+    button { cursor: pointer; border: none; font: inherit; font-size: 16px; font-weight: 700;
+      color: #fff; background: #e0533b; padding: 12px 30px; border-radius: 999px;
+      box-shadow: 0 6px 16px rgba(224,83,59,.4); }
+    button:hover { background: #c9432d; }
+    button.ghost { background: #e9e9ee; color: #444; box-shadow: none; }
+    button.ghost:hover { background: #dcdce3; }
+    .btnrow { display: flex; gap: 12px; justify-content: center; }
+    /* 暫停 / 結算視窗：計分板風 */
+    #pause .box, #msg .box { background: #14351f; color: #d7e8dc; border: 5px solid #2e6b40;
+      border-radius: 24px; box-shadow: 0 0 0 4px #0d2314, 0 22px 50px rgba(0,0,0,.45); }
+    #pause .box h2, #msg .box h2 { color: #ffe27a; font-size: 30px; }
+    #msg .box p { color: #b8d4c1; }
+    #pause #pause-text { color: #9fc4aa; font-weight: 700; }
+    #pause .btnrow, #msg .btnrow { margin-top: 8px; }
+    #pause .btnrow button, #msg .btnrow button { border-radius: 16px; padding: 13px 24px; font-weight: 900;
+      box-shadow: 0 4px 0 rgba(0,0,0,.25); transition: transform .08s; }
+    #pause .btnrow button:active, #msg .btnrow button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+    #resume-btn, #msg #next { background: linear-gradient(#ff9a3d, #ff6a00); }
+    #resume-btn:hover, #msg #next:hover { background: linear-gradient(#ffa74e, #ff7a12); }
+    #pause .btnrow .ghost, #msg .btnrow .ghost { background: #23543a; color: #d7e8dc; }
+    #pause .btnrow .ghost:hover, #msg .btnrow .ghost:hover { background: #2c684a; }
+    /* 星星 */
+    #stars { display: flex; gap: 10px; justify-content: center; margin: 6px 0 14px; }
+    #stars .star {
+      font-size: 46px; line-height: 1; color: #2c684a;
+      transform: scale(.4); opacity: .35; transition: transform .35s cubic-bezier(.2,1.6,.4,1), color .2s, opacity .2s;
+    }
+    #stars .star.on { color: #ffc32b; opacity: 1; transform: scale(1); text-shadow: 0 3px 10px rgba(255,195,43,.6); }
+    kbd { background: #eee; border-radius: 5px; padding: 1px 7px; font-family: monospace; color: #333; }
+    #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: #1d4a2c; color: #fff; font-size: 16px; z-index: 20; }
+
+    /* ===== 首頁（夜間球場燈光風）===== */
+    #landing { position: fixed; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+      background: radial-gradient(ellipse at 50% 118%, #3f8a4f 0%, #2b6b3d 24%, #17452a 46%, #0d2b1c 68%, #081a12 100%); }
+    #landing.hidden { display: none; }
+    #landing::before { content: ''; position: absolute; left: 50%; bottom: -26vh; width: 130vmin; height: 66vmin;
+      transform: translateX(-50%); border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+      background:
+        linear-gradient(transparent 62%, rgba(255,255,255,.09) 62.5%, transparent 63%),
+        conic-gradient(from 225deg at 50% 100%, transparent 0 12deg, rgba(255,255,255,.06) 12deg 13deg, transparent 13deg 44deg, rgba(255,255,255,.06) 44deg 45deg, transparent 45deg 77deg, rgba(255,255,255,.06) 77deg 78deg, transparent 78deg 90deg);
+      pointer-events: none; }
+    .land-panel { position: relative; z-index: 2; width: min(90vw, 430px); max-height: 96vh; overflow: visible;
+      background: #14351f; border: 5px solid #2e6b40; border-radius: 26px;
+      box-shadow: 0 0 0 4px #0d2314, 0 26px 60px rgba(0,0,0,.55);
+      padding: 24px 34px 18px; display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+      color: #d7e8dc; text-align: center; }
+    .land-title { font-size: clamp(30px, 6vw, 40px); font-weight: 900; letter-spacing: 2px; line-height: 1.15;
+      background: linear-gradient(180deg, #ffe27a, #ff8a2f); -webkit-background-clip: text; background-clip: text; color: transparent;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,.45)); }
+    .land-sub { font-size: 12px; font-weight: 800; color: #9fc4aa; letter-spacing: 3px; margin-top: -4px; }
+    #online-badge { align-self: center; display: inline-flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 800; color: #6fe08a; background: rgba(20,60,35,.9); border-radius: 999px; padding: 4px 12px; }
+    #online-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #34c759;
+      box-shadow: 0 0 0 0 rgba(52,199,89,.6); animation: pulse 1.6s infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,199,89,.5); } 70% { box-shadow: 0 0 0 7px rgba(52,199,89,0); } 100% { box-shadow: 0 0 0 0 rgba(52,199,89,0); } }
+    .land-name-label { font-size: 12px; font-weight: 800; color: #9fc4aa; letter-spacing: 1px; margin-top: 2px; }
+    #name-input { width: 100%; font-size: 17px; font-weight: 800; text-align: center; padding: 7px 14px;
+      border: 2px solid #2e6b40; border-radius: 12px; outline: none; color: #ffe27a; background: rgba(0,0,0,.3); }
+    #name-input::placeholder { color: #6c8a76; }
+    #name-input:focus { border-color: #ffa63d; }
+    #start-btn { width: 100%; border: none; border-radius: 14px; color: #fff; cursor: pointer;
+      font-weight: 900; padding: 10px; line-height: 1.1; box-shadow: 0 4px 0 rgba(0,0,0,.3), 0 6px 12px rgba(0,0,0,.3);
+      display: flex; flex-direction: column; align-items: center; gap: 0; transition: transform .1s, filter .1s;
+      background: linear-gradient(#ff9a3d, #ff6a00); }
+    #start-btn span.big { font-size: 20px; letter-spacing: 1px; }
+    #start-btn small { font-size: 11px; font-weight: 700; opacity: .92; }
+    #start-btn:hover:not(:disabled) { filter: brightness(1.05); }
+    #start-btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,.3); }
+    #start-btn:disabled { background: #46604e; box-shadow: none; cursor: not-allowed; opacity: .7; }
+    #name-hint { font-size: 12px; color: #ff9a8a; font-weight: 800; margin: -2px 0; min-height: 14px; }
+    .landing-btns { display: flex; gap: 8px; justify-content: center; }
+    .landing-btns .ghost { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+      font-size: 11px; font-weight: 800; color: #d7e8dc; background: rgba(255,255,255,.07); border: 2px solid #2e6b40;
+      border-radius: 12px; padding: 6px 2px; cursor: pointer; box-shadow: none; }
+    .landing-btns .ghost .ico { font-size: 18px; line-height: 1; }
+    .landing-btns .ghost:hover { background: rgba(255,255,255,.14); }
+    .landing-stat { font-size: 12px; font-weight: 700; color: #9fc4aa; margin-top: 2px; line-height: 1.5; }
+    .landing-stat b { color: #ffe27a; font-weight: 900; }
+    .land-panel .tip { font-size: 10px; color: #6c8a76; margin-top: 2px; }
+
+    /* 彈窗共用 */
+    .modal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,.55); z-index: 15; }
+    .modal.hidden { display: none; }
+    .lb-card { background: #fff; color: #222; border-radius: 18px; width: 90%; max-width: 460px; max-height: 82vh;
+      display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+    .lb-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px;
+      font-size: 18px; font-weight: 800; border-bottom: 1px solid #eee; }
+    .lb-head button { background: #eee; color: #666; box-shadow: none; padding: 4px 12px; font-size: 16px; }
+    #lb-list { overflow-y: auto; padding: 10px 16px 18px; }
+    .lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 1px solid #f2f2f5; font-size: 15px; }
+    .lb-rank { width: 26px; text-align: center; font-weight: 800; color: #bbb; }
+    .lb-rank.top { color: #ffc32b; font-size: 18px; }
+    .lb-name { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-note { font-size: 11px; font-weight: 800; color: #2e6b40; background: #e2f2e6;
+      border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+    .lb-score { font-weight: 800; color: #e0533b; min-width: 64px; text-align: right; }
+    .lb-empty { text-align: center; color: #999; padding: 24px; font-size: 14px; }
+    .lb-src { text-align: center; font-size: 12px; font-weight: 700; color: #888; padding: 2px 0 10px; }
+    .lb-row.me { background: #eefaf0; box-shadow: inset 0 0 0 2px #7bc98f; border-radius: 8px; }
+    .lb-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 20px 4px; justify-content: center; }
+    .lb-tab { font-size: 13px; font-weight: 800; color: #666; padding: 7px 14px; border: none;
+      border-radius: 999px; background: #eee; cursor: pointer; box-shadow: none; }
+    .lb-tab.active { background: #e0533b; color: #fff; }
+
+    /* 結算：名次 + 迷你排行榜 */
+    #msg-rank { font-size: 16px; font-weight: 800; color: #b8d4c1; margin: 4px 0 10px; }
+    #msg-rank:empty { display: none; }
+    #msg-rank b { color: #ffe27a; font-size: 22px; }
+    #msg-rank .rank-src { font-size: 13px; font-weight: 800; color: #9fc4aa; }
+    #msg-lb { text-align: left; margin: 0 auto 16px; max-width: 340px; }
+    #msg-lb:empty { display: none; }
+    #msg-lb .lb-row { font-size: 14px; padding: 5px 6px; border-bottom: 1px solid rgba(255,255,255,.08); color: #d7e8dc; }
+    #msg-lb .lb-rank { color: #6c8a76; }
+    #msg-lb .lb-rank.top { color: #ffc32b; }
+    #msg-lb .lb-score { color: #ffe27a; }
+    #msg-lb .lb-src { color: #9fc4aa; }
+    #msg-lb .lb-row.me { background: rgba(255,226,122,.12); box-shadow: inset 0 0 0 2px rgba(255,226,122,.5); }
+    #msg-lb .lb-note { color: #2e6b40; }
+
+    /* 留言板 */
+    .msg-compose { display: flex; gap: 8px; padding: 12px 16px 4px; }
+    #msg-input { flex: 1; min-width: 0; font-size: 14px; padding: 9px 12px; border: 2px solid #e6e6ee;
+      border-radius: 10px; outline: none; color: #222; }
+    #msg-input:focus { border-color: #e0533b; }
+    #msg-send { padding: 9px 16px; font-size: 14px; }
+    #msg-list { overflow-y: auto; padding: 10px 16px 18px; }
+    .msg-item { padding: 9px 6px; border-bottom: 1px solid #f2f2f5; font-size: 14px; text-align: left; }
+    .msg-item .m-name { font-weight: 800; color: #e0533b; }
+    .msg-item .m-when { font-size: 11px; color: #aaa; margin-left: 6px; }
+    .msg-item .m-text { color: #333; margin-top: 2px; word-break: break-word; }
+    .m-empty { text-align: center; color: #999; padding: 24px; font-size: 14px; }
+
+    /* 上線人數圖表 */
+    #online-body { padding: 14px 16px 20px; }
+    .on-now { text-align: center; font-size: 14px; color: #444; margin-bottom: 10px; }
+    .on-now b { color: #2e9e5b; font-size: 20px; }
+    #online-body svg { width: 100%; height: auto; }
+    .on-empty { text-align: center; color: #999; padding: 20px; font-size: 14px; }
+
+    /* 商店（球棒） */
+    #shop-count { font-weight: 800; color: #7a5a34; }
+    #shop-count.warn { color: #d24a2a; font-weight: 900; }
+    #shop-list { padding: 8px 16px 18px; overflow-y: auto; }
+    .shop-item { display: flex; align-items: center; gap: 12px; padding: 11px 6px; border-bottom: 1px solid #f2f2f5; }
+    .shop-emoji { font-size: 32px; }
+    .shop-info { flex: 1; text-align: left; }
+    .shop-name { font-weight: 800; color: #333; }
+    .shop-desc { font-size: 12px; color: #888; }
+    .bat-stats { font-size: 11px; color: #7a5a34; font-weight: 700; margin-top: 3px; }
+    .bat-bar { color: #ff8a2a; letter-spacing: 1px; }
+    .bat-bar .dim { color: #e2ddd2; }
+    .shop-toggle { padding: 7px 14px; font-size: 13px; background: #e9e9ee; color: #444; box-shadow: none; white-space: nowrap; }
+    .shop-toggle.on { background: #2e9e5b; color: #fff; }
+    .shop-buy { padding: 7px 14px; font-size: 14px; font-weight: 800; background: #f4b93a; color: #5a3d10;
+      box-shadow: none; white-space: nowrap; }
+    .shop-buy.poor { background: #e9e9ee; color: #aaa; }
+
+    /* 設定選單 */
+    .set-body { padding: 12px 20px 20px; display: flex; flex-direction: column; gap: 16px; }
+    .set-row { display: flex; align-items: center; gap: 12px; }
+    .set-row > span { flex: 0 0 96px; font-weight: 800; color: #444; font-size: 14px; }
+    .set-row input[type=range] { flex: 1; accent-color: #e0533b; height: 4px; }
+    .set-row > b { flex: 0 0 44px; text-align: right; font-weight: 900; color: #e0533b; }
+    .set-toggle { flex: 1; padding: 8px; font-size: 14px; font-weight: 800; border-radius: 10px;
+      background: #e9e9ee; color: #666; box-shadow: none; }
+    .set-toggle.on { background: #5bbe4a; color: #fff; }
+    .set-reset { margin-top: 4px; align-self: center; padding: 9px 20px; font-size: 14px; font-weight: 800;
+      border-radius: 999px; background: #efe6d0; color: #7a5a34; box-shadow: none; }
+    .set-reset:hover { background: #e6d8b8; }
+
+    /* 新手動態提示 */
+    #hint { position: fixed; left: 50%; bottom: 24%; transform: translate(-50%, 8px); z-index: 6;
+      pointer-events: none; background: rgba(0,0,0,.62); color: #fff; font-weight: 800;
+      font-size: clamp(14px, 3.4vw, 20px); padding: 11px 22px; border-radius: 999px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.4); max-width: 88vw; text-align: center;
+      opacity: 0; transition: opacity .35s ease, transform .35s ease; }
+    #hint.show { opacity: 1; transform: translate(-50%, 0); }
+    /* 連擊 */
+    #combo { position: fixed; left: 50%; top: 30%; transform: translate(-50%, -50%); z-index: 7;
+      pointer-events: none; text-align: center; font-weight: 900; color: #fff;
+      text-shadow: 0 3px 12px rgba(0,0,0,.55), 0 0 24px rgba(255,120,40,.7); white-space: nowrap; }
+    #combo.hidden { display: none; }
+    #combo #combo-n { font-size: clamp(48px, 12vw, 110px); line-height: 1;
+      background: linear-gradient(180deg, #ffe27a, #ff7a2f); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    #combo small { font-size: clamp(18px, 4vw, 32px); font-weight: 900; color: #ffd24a; margin-left: 4px; }
+    #combo #combo-b { display: block; font-size: clamp(16px, 3.4vw, 26px); color: #fff; margin-top: 2px; }
+    #combo.pop { animation: comboPop .2s ease-out; }
+    @keyframes comboPop { 0% { transform: translate(-50%,-50%) scale(.7); } 60% { transform: translate(-50%,-50%) scale(1.15); } 100% { transform: translate(-50%,-50%) scale(1); } }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="crosshair"></div>
+
+  <div id="hud">
+    <div class="stat"><span class="k">模式</span><span class="v" id="level"></span></div>
+    <div class="stat"><span class="k">分數</span><span class="v" id="score">0</span></div>
+    <div class="stat"><span class="k">球數</span><span class="v" id="count"></span></div>
+    <div class="stat"><span class="k">金幣</span><span class="v" id="coins">💰 0</span></div>
+    <div class="stat"><span class="k">最遠</span><span class="v" id="best">0.0 m</span></div>
+  </div>
+  <div id="pitch-label"></div>
+
+  <!-- 手機虛擬搖桿（瞄準）+ 揮棒鈕 -->
+  <div id="touch-controls">
+    <div id="joystick"><div id="joy-knob"></div></div>
+    <button id="swing-btn">揮棒！</button>
+    <button id="pause-btn">⏸</button>
+  </div>
+
+  <div id="banner" class="hidden"></div>
+  <div id="pause-hint" class="hidden"><kbd>Esc</kbd> 暫停 / 結束</div>
+
+  <!-- 暫停選單 -->
+  <div id="pause" class="hidden">
+    <div class="box">
+      <h2>⏸ 暫停</h2>
+      <p id="pause-text"></p>
+      <div class="btnrow">
+        <button id="resume-btn">▶ 繼續</button>
+        <button id="settings-btn-pause" class="ghost">⚙️ 設定</button>
+        <button id="end-btn" class="ghost">← 結束本場</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 刷新本場最遠距離：全螢幕大字 -->
+  <div id="dist-big" class="hidden">
+    <div class="fb-cap">最遠飛行距離</div>
+    <div class="fb-num"><span id="db-val">0.0</span><span class="fb-unit">m</span></div>
+  </div>
+
+  <!-- 新手動態提示 -->
+  <div id="hint"></div>
+
+  <!-- 連擊 -->
+  <div id="combo" class="hidden"><span id="combo-n">2</span><small> 連擊</small><span id="combo-b"></span></div>
+
+  <!-- 選單：模式選擇 + 挑戰關卡 -->
+  <div id="overlay">
+    <div class="menu">
+      <h2>⚾ 選擇模式</h2>
+      <p class="howto">
+        滑鼠瞄準 · 球到本壘瞬間點左鍵揮棒 · 縮圈貼合＝完美時機<br>
+        瞄球心下緣打高飛球 · 提早揮拉打左外野、晚揮推右外野 ·　<kbd>M</kbd> 音樂
+      </p>
+      <div class="mode-row">
+        <button id="derby-btn" class="mode-card"><span class="big">⚾ 全壘打大賽</span><small>10 球定勝負 · 上全球排行榜</small></button>
+        <button id="survival-btn" class="mode-card"><span class="big">🔥 生存連打</span><small>三振出局 · 球速越來越快</small></button>
+      </div>
+      <h3>📖 投手挑戰</h3>
+      <div id="level-list"></div>
+      <div class="menu-actions">
+        <span id="who"></span>
+        <button id="shop-btn-menu" class="ghost">🛒 球棒商店</button>
+        <button id="to-home" class="ghost">← 返回首頁</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 結算 -->
+  <div id="msg" class="hidden">
+    <div class="box">
+      <h2 id="msg-title"></h2>
+      <div id="stars"></div>
+      <p id="msg-text"></p>
+      <div id="msg-rank"></div>
+      <div id="msg-lb"></div>
+      <div class="btnrow">
+        <button id="to-menu" class="ghost">選單</button>
+        <button id="retry" class="ghost">再來一場</button>
+        <button id="next">下一關 ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 登入頁 -->
+  <div id="landing" class="hidden">
+    <div class="land-panel">
+      <div class="land-title">⚾ 憤怒棒球</div>
+      <div class="land-sub">ANGRY BASEBALL</div>
+      <div id="online-badge"><span class="dot"></span> 線上 <b id="online-n">–</b> 人</div>
+      <div class="land-name-label">打者名稱</div>
+      <input id="name-input" maxlength="12" placeholder="輸入你的名字" autocomplete="off" />
+      <button id="start-btn" disabled><span class="big">▶ 進場打擊</span><small>大賽 · 生存 · 投手挑戰</small></button>
+      <p id="name-hint">請先輸入名字才能開始</p>
+      <div class="landing-btns">
+        <button id="shop-btn-landing" class="ghost"><span class="ico">🛒</span>商店</button>
+        <button id="lb-btn-landing" class="ghost"><span class="ico">🏆</span>排行榜</button>
+        <button id="msg-btn-landing" class="ghost"><span class="ico">💬</span>留言板</button>
+        <button id="online-btn-landing" class="ghost"><span class="ico">📈</span>上線</button>
+        <button id="settings-btn-landing" class="ghost"><span class="ico">⚙️</span>設定</button>
+        <button id="music-toggle" class="ghost"><span class="ico">🔊</span>音樂</button>
+      </div>
+      <div class="landing-stat">全服累計　🎮 <b id="total-plays">–</b> 場　💥 <b id="total-kills">–</b> 轟　⏱ <b id="total-time">–</b></div>
+      <p class="tip">名字存在這台裝置，並記錄你的最高分與金幣</p>
+    </div>
+  </div>
+
+  <!-- 商店（球棒） -->
+  <div id="shop-modal" class="modal hidden">
+    <div class="lb-card">
+      <div class="lb-head"><span>🛒 球棒商店</span><button class="mclose" data-close="shop-modal">✕</button></div>
+      <div class="lb-src" id="shop-count" style="padding:10px 16px 0"></div>
+      <div id="shop-list"></div>
+    </div>
+  </div>
+
+  <!-- 設定 -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="lb-card">
+      <div class="lb-head"><span>⚙️ 設定</span><button class="mclose" data-close="settings-modal">✕</button></div>
+      <div class="set-body">
+        <label class="set-row"><span>🎯 靈敏度</span><input type="range" id="set-sens" min="0.3" max="2" step="0.1"><b id="set-sens-v"></b></label>
+        <label class="set-row"><span>🔊 音效音量</span><input type="range" id="set-sfx" min="0" max="100" step="1"><b id="set-sfx-v"></b></label>
+        <label class="set-row"><span>🎵 音樂音量</span><input type="range" id="set-mus" min="0" max="100" step="1"><b id="set-mus-v"></b></label>
+        <label class="set-row"><span>👁️ 視野 FOV</span><input type="range" id="set-fov" min="60" max="90" step="1"><b id="set-fov-v"></b></label>
+        <label class="set-row"><span>📳 畫面震動</span><button id="set-shake" class="set-toggle"></button></label>
+        <button id="set-reset" class="set-reset">↺ 回到預設值</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 排行榜 -->
+  <div id="lb-modal" class="modal hidden">
+    <div class="lb-card">
+      <div class="lb-head"><span>🏆 排行榜</span><button id="lb-close" class="mclose">✕</button></div>
+      <div class="lb-tabs" id="lb-tabs"></div>
+      <div id="lb-list"></div>
+    </div>
+  </div>
+
+  <!-- 留言板 -->
+  <div id="msg-modal" class="modal hidden">
+    <div class="lb-card">
+      <div class="lb-head"><span>💬 留言板</span><button class="mclose" data-close="msg-modal">✕</button></div>
+      <div class="msg-compose">
+        <input id="msg-input" maxlength="120" placeholder="留個言…（最多 120 字）" autocomplete="off" />
+        <button id="msg-send">送出</button>
+      </div>
+      <div id="msg-list"></div>
+    </div>
+  </div>
+
+  <!-- 上線人數 -->
+  <div id="online-modal" class="modal hidden">
+    <div class="lb-card">
+      <div class="lb-head"><span>📈 上線人數</span><button class="mclose" data-close="online-modal">✕</button></div>
+      <div id="online-body"></div>
+    </div>
+  </div>
+
+  <div id="loading">載入球場中…</div>
+
+  <script type="module" src="./game.js"></script>
+</body>
+</html>
