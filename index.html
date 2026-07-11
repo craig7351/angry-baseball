@@ -26,18 +26,6 @@
       box-shadow: none; }
     #pause-btn:active { background: rgba(0,0,0,.6); }
 
-    /* 準星 */
-    #crosshair {
-      position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
-      width: 22px; height: 22px; pointer-events: none; z-index: 4;
-    }
-    #crosshair::before, #crosshair::after {
-      content: ''; position: absolute; background: #fff;
-      box-shadow: 0 0 0 1px rgba(0,0,0,.85), 0 0 4px rgba(0,0,0,.6);
-    }
-    #crosshair::before { left: 50%; top: 0; width: 3px; height: 100%; transform: translateX(-50%); }
-    #crosshair::after { top: 50%; left: 0; height: 3px; width: 100%; transform: translateY(-50%); }
-
     /* HUD */
     #hud {
       position: fixed; top: 0; left: 0; right: 0; padding: 12px 16px;
@@ -338,7 +326,6 @@
 </head>
 <body>
   <canvas id="game"></canvas>
-  <div id="crosshair"></div>
 
   <div id="hud">
     <div class="stat"><span class="k">模式</span><span class="v" id="level"></span></div>

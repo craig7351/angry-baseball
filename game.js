@@ -268,7 +268,6 @@ function releaseBall() {
   game.phase = 'fly'; game.phaseT = 0
   sfx.pitch()
   showPitchLabel(`${cfg.special === 'chicken' ? '🐔 ' : cfg.special === 'bomb' ? '⚠️ 炸彈球 ' : cfg.special === 'gold' ? '✨ 黃金球 ' : ''}${P.name} ${Math.round(speed * 3.6)} km/h`)
-  zoneGroup.visible = true
   ring.visible = true
   magnetDot.visible = bat().fx === 'magnet'
   if (magnetDot.visible) magnetDot.position.set(target.x, target.y, CONTACT_Z)
@@ -278,7 +277,7 @@ function releaseBall() {
 const zoneGroup = new THREE.Group()
 {
   const edges = new THREE.EdgesGeometry(new THREE.PlaneGeometry(1.1, 0.9))
-  const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, depthTest: false }))
+  const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, depthTest: false }))
   line.renderOrder = 900
   zoneGroup.add(line)
   zoneGroup.position.set(0, 1.15, CONTACT_Z)
@@ -302,7 +301,29 @@ const magnetDot = (() => {
   sp.scale.set(0.3, 0.3, 1); sp.renderOrder = 902; sp.visible = false; scene.add(sp)
   return sp
 })()
-function hidePitchAids() { zoneGroup.visible = false; ring.visible = false; ringPerfect.visible = false; magnetDot.visible = false }
+function hidePitchAids() { ring.visible = false; ringPerfect.visible = false; magnetDot.visible = false }   // 好球帶白框與準星常駐，不在此隱藏
+
+// ---- 打擊準星：滑鼠只移動好球帶白框內的 3D 十字，鏡頭固定 ----
+const AIM_SENS = 0.0035           // 滑鼠像素 → 公尺
+const AIM_X = 0.55, AIM_Y0 = 0.7, AIM_Y1 = 1.6   // 準星活動範圍＝白框（1.1 × 0.9，中心 y 1.15）
+const aimPos = { x: 0, y: 1.15 }
+function clampAim() {
+  aimPos.x = Math.max(-AIM_X, Math.min(AIM_X, aimPos.x))
+  aimPos.y = Math.max(AIM_Y0, Math.min(AIM_Y1, aimPos.y))
+}
+const aimCross = (() => {
+  const s = 128, c = document.createElement('canvas'); c.width = c.height = s
+  const ctx = c.getContext('2d')
+  ctx.lineCap = 'round'
+  ctx.lineWidth = 16; ctx.strokeStyle = 'rgba(0,0,0,.75)'
+  ctx.beginPath(); ctx.moveTo(64, 10); ctx.lineTo(64, 118); ctx.moveTo(10, 64); ctx.lineTo(118, 64); ctx.stroke()
+  ctx.lineWidth = 9; ctx.strokeStyle = '#ffffff'
+  ctx.beginPath(); ctx.moveTo(64, 12); ctx.lineTo(64, 116); ctx.moveTo(12, 64); ctx.lineTo(116, 64); ctx.stroke()
+  const tex = new THREE.CanvasTexture(c)
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }))
+  sp.scale.set(0.2, 0.2, 1); sp.renderOrder = 903; sp.visible = false; scene.add(sp)
+  return sp
+})()
 
 // ============================================================
 //  第一人稱球棒 + 揮棒
@@ -369,13 +390,8 @@ function doSwing() {
   hintOnSwing()
   if (!ball || ball.state !== 'incoming' || ball.swung) { if (bat().fx === 'chaos') sfx.fish(); else sfx.whiff(); return }
   ball.swung = true
-  // 準星射線與觸擊平面的交點
-  const dir = new THREE.Vector3(); camera.getWorldDirection(dir)
-  let aim = { x: 0, y: 1.1 }
-  if (dir.z < -0.05) {
-    const t = (CONTACT_Z - camera.position.z) / dir.z
-    aim = { x: camera.position.x + dir.x * t, y: camera.position.y + dir.y * t }
-  }
+  // 揮棒位置＝白框內的打擊準星
+  const aim = { x: aimPos.x, y: aimPos.y }
   const res = judgeSwing(ball.body.position, ball.body.velocity, aim, bat())
   if (window.__DBG) console.log('[swing]', JSON.stringify({ bz: +ball.body.position.z.toFixed(2), by: +ball.body.position.y.toFixed(2), bx: +ball.body.position.x.toFixed(2), vz: +ball.body.velocity.z.toFixed(1), aim: { x: +aim.x.toFixed(2), y: +aim.y.toFixed(2) }, res: res && { tier: res.tier, q: +res.q.toFixed(2), tErr: +res.tErr.toFixed(3) } }))
   if (!res) {   // 揮空
@@ -1282,8 +1298,8 @@ document.addEventListener('visibilitychange', () => {
 // ============================================================
 //  第一人稱控制（指標鎖定；打擊只需小幅瞄準）
 // ============================================================
-let locked = false, yaw = 0, pitch = -0.3   // 預設視角微微下望：準星正對好球帶中心
-const SENS = 0.0016
+let locked = false
+const yaw = 0, pitch = -0.3   // 鏡頭固定：微微下望正對好球帶
 function exitLock() { if (document.pointerLockElement) document.exitPointerLock() }
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas
@@ -1295,11 +1311,10 @@ document.addEventListener('pointerlockchange', () => {
 })
 document.addEventListener('mousemove', (e) => {
   if (!locked || (game && game.intro) || (game && game.ballcam)) return
-  yaw -= e.movementX * SENS * settings.sens
-  pitch -= e.movementY * SENS * settings.sens
-  yaw = Math.max(-0.55, Math.min(0.55, yaw))
-  pitch = Math.max(-0.55, Math.min(0.3, pitch))
-  camera.rotation.y = yaw; camera.rotation.x = pitch
+  // 鏡頭固定：滑鼠只移動白框內的打擊準星
+  aimPos.x += e.movementX * AIM_SENS * settings.sens
+  aimPos.y -= e.movementY * AIM_SENS * settings.sens
+  clampAim()
 })
 canvas.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return
@@ -1419,13 +1434,11 @@ function loop() {
       updateIntroCamera(game.introT / INTRO_DUR)
       if (game.introT >= INTRO_DUR) endIntro()
     } else {
-      // 手機搖桿瞄準
+      // 手機搖桿：移動打擊準星（鏡頭固定）
       if (IS_TOUCH && (lookX || lookY) && !game.ballcam) {
-        yaw -= lookX * LOOK_RATE * settings.sens * dt
-        pitch -= lookY * LOOK_RATE * settings.sens * dt
-        yaw = Math.max(-0.55, Math.min(0.55, yaw))
-        pitch = Math.max(-0.55, Math.min(0.3, pitch))
-        camera.rotation.y = yaw; camera.rotation.x = pitch
+        aimPos.x += lookX * LOOK_RATE * settings.sens * dt
+        aimPos.y -= lookY * LOOK_RATE * settings.sens * dt
+        clampAim()
       }
       pendingSeconds += dt
       // ---- 投球狀態機 ----
@@ -1517,6 +1530,11 @@ function loop() {
     overlay.classList.contains('hidden') && landing.classList.contains('hidden')
   hudEl.style.display = inGame ? '' : 'none'
   batView.visible = inGame && !game.intro && !game.ballcam
+  // 好球帶白框 + 打擊準星：打擊視角時常駐顯示
+  const aimUi = inGame && !game.intro && !game.ballcam
+  zoneGroup.visible = aimUi
+  aimCross.visible = aimUi
+  if (aimUi) aimCross.position.set(aimPos.x, aimPos.y, CONTACT_Z + 0.02)
   if (touchControls) touchControls.classList.toggle('show', IS_TOUCH && inGame)
 
   // 畫面震動
@@ -1537,8 +1555,6 @@ function resize() {
   camera.aspect = w / h
   camera.fov = camera.aspect >= 1 ? settings.fov : Math.max(settings.fov - 8, Math.min(settings.fov + 6, settings.fov - 14 + camera.aspect * 24))
   camera.updateProjectionMatrix()
-  const cx = document.getElementById('crosshair')
-  cx.style.left = (w / 2) + 'px'; cx.style.top = (h / 2) + 'px'
 }
 window.addEventListener('resize', resize)
 window.addEventListener('orientationchange', resize)
