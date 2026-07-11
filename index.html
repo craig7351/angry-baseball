@@ -316,15 +316,15 @@
       box-shadow: 0 4px 16px rgba(0,0,0,.4); max-width: 88vw; text-align: center;
       opacity: 0; transition: opacity .35s ease, transform .35s ease; }
     #hint.show { opacity: 1; transform: translate(-50%, 0); }
-    /* 連擊 */
-    #combo { position: fixed; left: 50%; top: 30%; transform: translate(-50%, -50%); z-index: 7;
+    /* 連擊（放畫面下方，避免跟中央的全壘打橫幅重疊） */
+    #combo { position: fixed; left: 50%; top: 66%; transform: translate(-50%, -50%); z-index: 7;
       pointer-events: none; text-align: center; font-weight: 900; color: #fff;
       text-shadow: 0 3px 12px rgba(0,0,0,.55), 0 0 24px rgba(255,120,40,.7); white-space: nowrap; }
     #combo.hidden { display: none; }
-    #combo #combo-n { font-size: clamp(48px, 12vw, 110px); line-height: 1;
+    #combo #combo-n { font-size: clamp(40px, 8vw, 84px); line-height: 1;
       background: linear-gradient(180deg, #ffe27a, #ff7a2f); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    #combo small { font-size: clamp(18px, 4vw, 32px); font-weight: 900; color: #ffd24a; margin-left: 4px; }
-    #combo #combo-b { display: block; font-size: clamp(16px, 3.4vw, 26px); color: #fff; margin-top: 2px; }
+    #combo small { font-size: clamp(16px, 3.2vw, 26px); font-weight: 900; color: #ffd24a; margin-left: 4px; }
+    #combo #combo-b { display: block; font-size: clamp(14px, 2.8vw, 22px); color: #fff; margin-top: 2px; }
     #combo.pop { animation: comboPop .2s ease-out; }
     @keyframes comboPop { 0% { transform: translate(-50%,-50%) scale(.7); } 60% { transform: translate(-50%,-50%) scale(1.15); } 100% { transform: translate(-50%,-50%) scale(1); } }
   </style>

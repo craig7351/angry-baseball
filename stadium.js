@@ -245,6 +245,37 @@ export function buildStadium() {
     }
   }
 
+  // --- 場外卡通樹（InstancedMesh，撒在觀眾席外圍與本壘後方）---
+  const spots = []
+  for (let i = 0; i < 300 && spots.length < 70; i++) {
+    const a = Math.random() * Math.PI * 2                    // 0 = 中外野方向
+    const front = Math.abs(a) < 1.0 || Math.abs(a - Math.PI * 2) < 1.0
+    const d = front ? 135 + Math.random() * 110 : 45 + Math.random() * 180
+    const x = Math.sin(a) * d, z = -Math.cos(a) * d
+    // 避開球場本體（牆 + 看台圈）與打者正後方視線
+    if (z < 0 && Math.hypot(x, z) < 132 && Math.abs(x) <= -z + 25) continue
+    if (z > 0 && Math.hypot(x, z) < 32) continue
+    spots.push({ x, z, s: 2.6 + Math.random() * 3.2, rot: Math.random() * Math.PI })
+  }
+  const trunkMesh = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.16, 0.24, 1.4, 6),
+    new THREE.MeshStandardMaterial({ color: 0x6e4a2a, roughness: 1 }), spots.length)
+  const leafMesh = new THREE.InstancedMesh(
+    new THREE.IcosahedronGeometry(1.1, 0),
+    new THREE.MeshStandardMaterial({ color: 0x4fa838, roughness: 1, flatShading: true }), spots.length)
+  const mtx = new THREE.Matrix4(), q = new THREE.Quaternion()
+  spots.forEach((t, i) => {
+    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), t.rot)
+    mtx.compose(new THREE.Vector3(t.x, 0.7 * t.s, t.z), q, new THREE.Vector3(t.s, t.s, t.s))
+    trunkMesh.setMatrixAt(i, mtx)
+    mtx.compose(new THREE.Vector3(t.x, (1.4 + 0.7) * t.s, t.z), q, new THREE.Vector3(t.s * 1.05, t.s * 1.15, t.s * 1.05))
+    leafMesh.setMatrixAt(i, mtx)
+  })
+  trunkMesh.instanceMatrix.needsUpdate = leafMesh.instanceMatrix.needsUpdate = true
+  trunkMesh.frustumCulled = leafMesh.frustumCulled = false
+  scene.add(trunkMesh, leafMesh)
+  env.leafMat = leafMesh.material; env.trunkMat = trunkMesh.material
+
   // --- 遠景低多邊形山丘 ---
   const hillGeo = new THREE.IcosahedronGeometry(1, 0)
   const hillGreens = [0x4e9e38, 0x5aac42, 0x459132, 0x66b84c]
@@ -307,22 +338,22 @@ export const BIOMES = [
     sky: ['#3f9fe6', '#8fd0f2', '#e9f6d6'], fog: 0xcfeaf5,
     hemi: [0xbfe4ff, 0x6b7a3a, 0.95], sun: [0xfff0d0, 2.7, [-30, 55, 20]], amb: [0xffffff, 0.32],
     grass: GRASS_DEF,
-    hills: [0x4e9e38, 0x5aac42, 0x459132, 0x66b84c], cloud: [0xffffff, 0.92], wall: 0x2e6db4 },
+    hills: [0x4e9e38, 0x5aac42, 0x459132, 0x66b84c], cloud: [0xffffff, 0.92], wall: 0x2e6db4, leaf: 0x4fa838, trunk: 0x6e4a2a },
   { name: '🌅 黃昏球場',
     sky: ['#ff7e3d', '#ffb066', '#ffe3b0'], fog: 0xf0b878,
     hemi: [0xffd0a0, 0x7a5636, 0.92], sun: [0xffa050, 2.6, [40, 32, 22]], amb: [0xffe0c0, 0.36],
     grass: { base: '#7aa544', a: '#86b04e', b: '#6e983c', lite: 'rgba(220,200,120,0.3)', dark: 'rgba(90,90,40,0.3)' },
-    hills: [0xc79a5a, 0xb98a4a, 0xd4a866, 0xa87a3e], cloud: [0xffd9a0, 0.82], wall: 0x8a4a3a },
+    hills: [0xc79a5a, 0xb98a4a, 0xd4a866, 0xa87a3e], cloud: [0xffd9a0, 0.82], wall: 0x8a4a3a, leaf: 0x9c7a3e, trunk: 0x6e4a2a },
   { name: '❄️ 雪地球場',
     sky: ['#8fb8e0', '#cfe4f5', '#eef6fb'], fog: 0xdfeaf2,
     hemi: [0xdfeeff, 0x9aa8b0, 1.0], sun: [0xeaf2ff, 2.4, [-25, 50, 20]], amb: [0xffffff, 0.42],
     grass: { base: '#e6edf2', a: '#f2f6f9', b: '#d7e1e9', lite: 'rgba(255,255,255,0.5)', dark: 'rgba(175,190,205,0.3)' },
-    hills: [0xcdd9e2, 0xdbe6ee, 0xbccad6, 0xe6eef4], cloud: [0xf2f6fb, 0.9], wall: 0x3a6a8a },
+    hills: [0xcdd9e2, 0xdbe6ee, 0xbccad6, 0xe6eef4], cloud: [0xf2f6fb, 0.9], wall: 0x3a6a8a, leaf: 0xdfe9f0, trunk: 0x5a4636 },
   { name: '🌃 夜間球場',
     sky: ['#0b1030', '#1a2350', '#33406e'], fog: 0x1a2246,
     hemi: [0x6070b0, 0x24283e, 0.78], sun: [0xcfe0ff, 2.0, [-20, 45, 15]], amb: [0x9aa8d8, 0.55],
     grass: { base: '#2c5a38', a: '#346844', b: '#244c2e', lite: 'rgba(90,230,180,0.22)', dark: 'rgba(10,28,20,0.4)' },
-    hills: [0x223055, 0x2a3a66, 0x1c2848, 0x30407a], cloud: [0x3a4680, 0.5], wall: 0x28407a },
+    hills: [0x223055, 0x2a3a66, 0x1c2848, 0x30407a], cloud: [0x3a4680, 0.5], wall: 0x28407a, leaf: 0x2f6d55, trunk: 0x2a2436 },
 ]
 let currentBiome = -1
 export function applyBiome(i) {
@@ -339,6 +370,8 @@ export function applyBiome(i) {
   env.hills.forEach((h, k) => h.material.color.set(b.hills[k % b.hills.length]))
   if (env.cloudMat) { env.cloudMat.color.set(b.cloud[0]); env.cloudMat.opacity = b.cloud[1] }
   if (env.wallMats) env.wallMats.forEach((m) => m.color.set(b.wall))
+  if (env.leafMat) env.leafMat.color.set(b.leaf)
+  if (env.trunkMat) env.trunkMat.color.set(b.trunk)
 }
 
 // 主迴圈呼叫：雲飄移 + 觀眾彈跳
