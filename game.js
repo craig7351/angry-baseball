@@ -965,10 +965,14 @@ async function showLevelRank(levelName, score, note) {
 // ============================================================
 //  社群：線上人數 / 全服統計 / 留言板
 // ============================================================
-async function postHeartbeat() {
-  try { await fetch('/api/heartbeat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ deviceId }) }) } catch {}
+// 進場記錄 + 取線上人數（近 3 小時活躍）：只在進場呼叫一次，取代舊的心跳輪詢
+async function enterOnline() {
+  try {
+    const r = await fetch('/api/online', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ deviceId }) })
+    if (r.ok) { const j = await r.json(); const el = document.getElementById('online-n'); if (el && j.online != null) el.textContent = j.online }
+  } catch {}
 }
-async function refreshOnline() {
+async function refreshOnline() {   // 只讀人數（開「上線」視窗時用），不寫入
   try { const r = await fetch('/api/online'); if (r.ok) { const j = await r.json(); const el = document.getElementById('online-n'); if (el && j.online != null) el.textContent = j.online } } catch {}
 }
 const fmtDuration = (sec) => {
@@ -1003,6 +1007,25 @@ const timeAgo = (at) => {
   if (s < 86400) return Math.floor(s / 3600) + ' 小時前'
   return Math.floor(s / 86400) + ' 天前'
 }
+// ---- 留言板（分層顯示 + 回覆 + 刪除；刪除需管理密碼；同 angry-pig 修正版）----
+let replyTo = null   // { id, name } 目前正在回覆的留言
+function setReply(id, name) {
+  replyTo = id ? { id, name } : null
+  const hint = document.getElementById('msg-reply-hint'); if (!hint) return
+  hint.classList.toggle('hidden', !replyTo)
+  if (replyTo) {
+    hint.innerHTML = `↩ 回覆 <b>@${escapeHtml(replyTo.name)}</b><button id="msg-reply-cancel">✕ 取消</button>`
+    const t = document.getElementById('msg-input'); if (t) t.focus()
+  }
+}
+function msgItemHtml(m, isReply) {
+  const acts = '<div class="m-acts">' +
+    (isReply ? '' : `<button class="m-act" data-reply="${m.id}" data-name="${escapeHtml(m.name)}">↩ 回覆</button>`) +
+    `<button class="m-act" data-del="${m.id}">🗑 刪除</button></div>`
+  return `<div class="msg-item${isReply ? ' m-reply' : ''}">` +
+    `<div><span class="m-name">${escapeHtml(m.name)}</span><span class="m-when">${timeAgo(m.at)}</span></div>` +
+    `<div class="m-text">${escapeHtml(m.text)}</div>${acts}</div>`
+}
 async function loadMessages() {
   const list = document.getElementById('msg-list')
   list.innerHTML = '<div class="m-empty">載入中…</div>'
@@ -1010,10 +1033,13 @@ async function loadMessages() {
   try { const r = await fetch('/api/messages'); if (r.ok) { const j = await r.json(); if (Array.isArray(j)) msgs = j } } catch {}
   if (msgs === null) { list.innerHTML = '<div class="m-empty">留言板需連線到伺服器（線上版才可用）</div>'; return }
   if (!msgs.length) { list.innerHTML = '<div class="m-empty">還沒有留言，搶頭香！</div>'; return }
-  list.innerHTML = msgs.map((m) =>
-    `<div class="msg-item"><div><span class="m-name">${escapeHtml(m.name)}</span>` +
-    `<span class="m-when">${timeAgo(m.at)}</span></div>` +
-    `<div class="m-text">${escapeHtml(m.text)}</div></div>`).join('')
+  const tops = msgs.filter((m) => m.parentId == null)                         // 頂層留言（API 已依新→舊）
+  const byParent = {}
+  for (const m of msgs) if (m.parentId != null) (byParent[m.parentId] = byParent[m.parentId] || []).push(m)
+  list.innerHTML = tops.map((t) => {
+    const reps = (byParent[t.id] || []).sort((a, b) => a.id - b.id)            // 回覆舊→新
+    return msgItemHtml(t, false) + reps.map((r) => msgItemHtml(r, true)).join('')
+  }).join('')
 }
 async function sendMessage() {
   const input = document.getElementById('msg-input')
@@ -1021,17 +1047,35 @@ async function sendMessage() {
   if (!text) return
   const btn = document.getElementById('msg-send'); btn.disabled = true
   try {
+    const nameEl = document.getElementById('msg-name')
+    const name = (nameEl && nameEl.value.trim()) || playerName || '匿名'
+    try { localStorage.setItem('angrybb:msgname', name) } catch {}   // 記住自訂名字
+    const body = { name, text, deviceId }
+    if (replyTo) body.parentId = replyTo.id
     const r = await fetch('/api/messages', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: playerName || '匿名', text, deviceId }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
     })
     const j = await r.json().catch(() => ({}))
-    if (r.ok && j.ok) { input.value = ''; await loadMessages() }
+    if (r.ok && j.ok) { input.value = ''; setReply(null); await loadMessages() }
     else if (j.error === 'too fast') alert('留言太頻繁，請稍候再試')
     else if (j.error === 'blocked') alert('留言含不當字詞，已擋下')
     else alert('留言失敗（需連線到線上版）')
   } catch { alert('留言失敗（需連線到線上版）') }
   btn.disabled = false
+}
+async function deleteMessage(id) {
+  const key = prompt('刪除留言需要管理密碼：')
+  if (key == null || key === '') return
+  try {
+    const r = await fetch('/api/messages', {
+      method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: +id, key }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (r.ok && j.ok) await loadMessages()
+    else if (j.error === 'forbidden') alert('密碼錯誤')
+    else if (j.error === 'disabled') alert('刪除功能未啟用')
+    else alert('刪除失敗')
+  } catch { alert('刪除失敗') }
 }
 const dayLabel = (at) => { const d = new Date(at); return `${d.getMonth() + 1}/${d.getDate()}` }
 async function openOnline() {
@@ -1211,10 +1255,21 @@ document.getElementById('lb-btn-landing').addEventListener('click', openLB)
 document.getElementById('shop-btn-landing').addEventListener('click', openShop)
 document.getElementById('shop-btn-menu').addEventListener('click', openShop)
 const msgModal = document.getElementById('msg-modal')
-document.getElementById('msg-btn-landing').addEventListener('click', () => { loadMessages(); msgModal.classList.remove('hidden') })
+function openMsg() {
+  const mn = document.getElementById('msg-name')
+  if (mn && !mn.value) { let saved = ''; try { saved = localStorage.getItem('angrybb:msgname') || '' } catch {}; mn.value = saved || playerName || '' }
+  setReply(null); loadMessages(); msgModal.classList.remove('hidden')
+}
+document.getElementById('msg-btn-landing').addEventListener('click', openMsg)
 document.getElementById('online-btn-landing').addEventListener('click', openOnline)
 document.getElementById('msg-send').addEventListener('click', sendMessage)
 document.getElementById('msg-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage() })
+// 留言列表：回覆 / 刪除（事件委派）
+document.getElementById('msg-list').addEventListener('click', (e) => {
+  const rep = e.target.closest('[data-reply]'); if (rep) { setReply(+rep.dataset.reply, rep.dataset.name); return }
+  const del = e.target.closest('[data-del]'); if (del) { deleteMessage(del.dataset.del) }
+})
+document.getElementById('msg-reply-hint').addEventListener('click', (e) => { if (e.target.closest('#msg-reply-cancel')) setReply(null) })
 for (const btn of document.querySelectorAll('.mclose[data-close]')) {
   btn.addEventListener('click', () => document.getElementById(btn.dataset.close).classList.add('hidden'))
 }
@@ -1298,14 +1353,10 @@ document.getElementById('end-btn').addEventListener('click', () => {
   endGame()
 })
 document.getElementById('pause-btn').addEventListener('click', pauseGame)
-// 心跳 / 統計
-postHeartbeat(); refreshOnline(); refreshTotals()
-setInterval(() => { if (!document.hidden) { postHeartbeat(); refreshOnline() } }, 90000)
+// 進場只上報一次（不再心跳輪詢）：線上人數 = 近 3 小時活躍人數 → 大幅降低 Functions 請求數
+enterOnline(); refreshTotals()
 setInterval(() => { if (!document.hidden) flushTotals() }, 30000)
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) flushTotals()
-  else { postHeartbeat(); refreshOnline() }
-})
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushTotals() })
 
 // ============================================================
 //  第一人稱控制（指標鎖定；打擊只需小幅瞄準）
@@ -1337,8 +1388,8 @@ canvas.addEventListener('mousedown', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && game && game.intro) endIntro()
 })
-// 手機：虛擬搖桿（瞄準）+ 揮棒鈕
-const LOOK_RATE = 0.9
+// 手機：虛擬搖桿（移動打擊準星）+ 揮棒鈕
+const LOOK_RATE = 1.8   // 搖桿滿舵時準星移動速度（公尺/秒）；好球帶寬 1.1m，約 0.6 秒掃過全區
 let lookX = 0, lookY = 0
 const touchControls = document.getElementById('touch-controls')
 const hudEl = document.getElementById('hud')
@@ -1456,7 +1507,7 @@ function loop() {
       // ---- 投球狀態機 ----
       game.phaseT += dt
       if (game.phase === 'wait' && game.phaseT >= 0) startWindup()
-      if (window.__DBG) window.__dbgBallZ = (ball && ball.state === 'incoming') ? ball.body.position.z : null
+      if (window.__DBG) { window.__dbgBallZ = (ball && ball.state === 'incoming') ? ball.body.position.z : null; window.__dbgAim = { x: aimPos.x, y: aimPos.y } }
       if (game.phase === 'fly' && ball && ball.state === 'incoming') {
         const p = ball.body.position
         // 時機縮圈：跟著剩餘時間收縮
