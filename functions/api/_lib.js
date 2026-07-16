@@ -47,13 +47,25 @@ export async function rateLimited(env, key, windowMs) {
   const now = Date.now()
   try {
     const row = await env.DB.prepare('SELECT last_at FROM rate WHERE k=?').bind(key).first()
-    if (row && now - row.last_at < windowMs) return true
+    if (row && now - row.last_at < windowMs) {
+      // 被擋下的次數 +1：正常玩家極少觸發，數字高＝有人在轟炸（管理面板的攻擊訊號）
+      await env.DB.prepare('UPDATE rate SET hits = hits + 1 WHERE k=?').bind(key).run()
+      return true
+    }
     await env.DB.prepare('INSERT INTO rate (k,last_at) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET last_at=?')
       .bind(key, now, now).run()
     return false
   } catch {
     return false
   }
+}
+
+/** 安全事件記錄（只在異常時呼叫；失敗靜默，不影響主流程） */
+export async function audit(env, kind, ip, detail = '') {
+  try {
+    await env.DB.prepare('INSERT INTO audit (at, kind, ip, detail) VALUES (?,?,?,?)')
+      .bind(Date.now(), kind, ip || '', String(detail).slice(0, 120)).run()
+  } catch {}
 }
 
 /** 清理文字：移除角括號與控制字元（\p{C}），限長 */

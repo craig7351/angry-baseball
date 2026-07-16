@@ -14,11 +14,23 @@ CREATE TABLE IF NOT EXISTS scores (
 CREATE INDEX IF NOT EXISTS idx_scores_score ON scores (score DESC);
 CREATE INDEX IF NOT EXISTS idx_scores_level_score ON scores (level, score DESC);
 
--- 速率限制：key（action:ip）最後一次寫入時間
+-- 速率限制：key（action:ip）最後一次寫入時間；hits＝被擋下的次數（攻擊訊號，管理面板用）
 CREATE TABLE IF NOT EXISTS rate (
   k TEXT PRIMARY KEY,
-  last_at INTEGER NOT NULL
+  last_at INTEGER NOT NULL,
+  hits INTEGER NOT NULL DEFAULT 0
 );
+-- 既有資料庫補欄位：ALTER TABLE rate ADD COLUMN hits INTEGER NOT NULL DEFAULT 0;
+
+-- 安全事件（只在異常時寫入）：管理密碼錯誤 / 分數不合理 / 留言攔截等，保留 7 天
+CREATE TABLE IF NOT EXISTS audit (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  ip TEXT,
+  detail TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_audit_at ON audit (at);
 
 -- 在線：記錄各裝置最後進場時間；線上人數 = 近 3 小時內活躍的 distinct 裝置數（無心跳輪詢）
 CREATE TABLE IF NOT EXISTS presence (

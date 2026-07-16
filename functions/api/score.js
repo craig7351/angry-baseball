@@ -1,4 +1,4 @@
-import { json, clampInt, sanitizeText, clientIp, rateLimited } from './_lib.js'
+import { json, clampInt, sanitizeText, clientIp, rateLimited, audit } from './_lib.js'
 
 // POST /api/score — 送出一場得分 { name, score, level, note, deviceId }
 //   note＝額外資訊（不影響排名）：大賽＝全壘打數、生存＝安打數、最遠＝達成模式
@@ -36,8 +36,11 @@ export const onRequestPost = async ({ request, env }) => {
   const note = sanitizeText(body.note, 24)
   const device = sanitizeText(body.deviceId, 64)
   if (score <= 0) return json({ ok: false })
-  // 合理性檢查：分數與安打數/模式明顯不符 → 拒收（前端會自動退回本機名次，不影響遊玩）
-  if (score > maxPlausibleScore(level, note)) return json({ ok: false, error: 'implausible' }, 422)
+  // 合理性檢查：分數與安打數/模式明顯不符 → 拒收 + 記安全事件（前端會自動退回本機名次，不影響遊玩）
+  if (score > maxPlausibleScore(level, note)) {
+    await audit(env, 'score-implausible', clientIp(request), `${name} ${level} ${score.toLocaleString()}`)
+    return json({ ok: false, error: 'implausible' }, 422)
+  }
   try {
     await env.DB.prepare('INSERT INTO scores (device_id,name,level,score,note,created_at) VALUES (?,?,?,?,?,?)')
       .bind(device, name, level, score, note, Date.now()).run()

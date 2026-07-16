@@ -1276,8 +1276,128 @@ for (const btn of document.querySelectorAll('.mclose[data-close]')) {
 const settingsModal = document.getElementById('settings-modal')
 const onlineModal = document.getElementById('online-modal')
 const debugModal = document.getElementById('debug-modal')
-for (const m of [msgModal, onlineModal, shopModal, settingsModal, debugModal]) m.addEventListener('click', (e) => {
+const adminModal = document.getElementById('admin-modal')
+for (const m of [msgModal, onlineModal, shopModal, settingsModal, debugModal, adminModal]) m.addEventListener('click', (e) => {
   if (e.target === m) m.classList.add('hidden')
+})
+// ============================================================
+//  管理面板（唯讀攻擊分析儀表板；密碼驗證走後端 ADMIN_KEY，同 IP 5 秒限流）
+// ============================================================
+const ADMIN_TABS = [
+  { k: 'overview', label: '📊 總覽' },
+  { k: 'audit', label: '🚨 異常事件' },
+  { k: 'rate', label: '🔥 限流排行' },
+  { k: 'scores', label: '⚾ 最新成績' },
+  { k: 'presence', label: '👥 進場裝置' },
+]
+const KIND_LABEL = {
+  'admin-forbidden': '管理密碼錯誤', 'del-forbidden': '刪除密碼錯誤',
+  'score-implausible': '分數不合理', 'msg-blocked': '留言攔截',
+}
+let adminKey = ''
+try { adminKey = sessionStorage.getItem('angrybb:adminkey') || '' } catch {}
+const adminTabsEl = document.getElementById('admin-tabs')
+const adminBody = document.getElementById('admin-body')
+adminTabsEl.innerHTML = ADMIN_TABS.map((t) => `<button class="lb-tab" data-k="${t.k}">${t.label}</button>`).join('')
+async function fetchAdmin(view) {
+  const r = await fetch('/api/admin', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ key: adminKey, view }),
+  })
+  const j = await r.json().catch(() => ({}))
+  j.status = r.status
+  return j
+}
+function adminShowPanel() {
+  document.getElementById('admin-auth').classList.add('hidden')
+  document.getElementById('admin-panel').classList.remove('hidden')
+}
+function adminShowAuth() {
+  document.getElementById('admin-auth').classList.remove('hidden')
+  document.getElementById('admin-panel').classList.add('hidden')
+}
+function setAdminTab(k) { for (const b of adminTabsEl.children) b.classList.toggle('active', b.dataset.k === k) }
+function renderAdmin(view, j) {
+  const t = timeAgo
+  if (view === 'overview') {
+    const kinds = (j.kinds || []).map((x) => `<div class="ad-stat"><span>🚨 ${KIND_LABEL[x.kind] || escapeHtml(x.kind)}（24h）</span><b>${x.n}</b></div>`).join('')
+    const blocked = (j.blocked || []).map((x) =>
+      `<div class="ad-row"><span class="ad-ip">${escapeHtml(x.k)}</span> 被擋 <b>${x.hits}</b> 次<span class="ad-when">${t(x.last_at)}</span></div>`).join('')
+    adminBody.innerHTML =
+      `<div class="ad-stat"><span>⚾ 24h 成績送出</span><b>${j.scores24}</b></div>` +
+      `<div class="ad-stat"><span>💬 24h 留言</span><b>${j.msgs24}</b></div>` +
+      `<div class="ad-stat"><span>👥 24h 進場裝置</span><b>${j.dev24}</b></div>` +
+      `<div class="ad-stat"><span>👥 1h 進場裝置</span><b>${j.dev1h}</b></div>` +
+      (kinds || '<div class="ad-note">近 24 小時沒有任何異常事件 ✅</div>') +
+      (blocked ? '<div class="ad-note">— 被限流擋下的來源（動作:IP・累計次數）—</div>' + blocked : '')
+  } else if (view === 'audit') {
+    adminBody.innerHTML = (j.rows || []).length ? j.rows.map((r) =>
+      `<div class="ad-row"><span class="ad-kind">${KIND_LABEL[r.kind] || escapeHtml(r.kind)}</span>` +
+      `<span class="ad-ip">${escapeHtml(r.ip || '')}</span><span class="ad-when">${t(r.at)}</span>` +
+      (r.detail ? `<div class="ad-detail">${escapeHtml(r.detail)}</div>` : '') + '</div>').join('')
+      : '<div class="ad-note">沒有異常事件 ✅</div>'
+  } else if (view === 'rate') {
+    adminBody.innerHTML = (j.rows || []).length ? j.rows.map((r) =>
+      `<div class="ad-row"><span class="ad-ip">${escapeHtml(r.k)}</span> 被擋 <b>${r.hits}</b> 次<span class="ad-when">${t(r.last_at)}</span></div>`).join('')
+      : '<div class="ad-note">沒有任何來源被限流擋下 ✅</div>'
+  } else if (view === 'scores') {
+    adminBody.innerHTML = (j.rows || []).length ? j.rows.map((r) =>
+      `<div class="ad-row"><b>${escapeHtml(r.name || '')}</b> ${Number(r.score).toLocaleString()} 分` +
+      `<span class="ad-when">${escapeHtml(r.level || '')}${r.note ? '・' + escapeHtml(r.note) : ''}・${t(r.created_at)}</span>` +
+      `<div class="ad-detail ad-ip">${escapeHtml((r.device_id || '').slice(0, 24))}</div></div>`).join('')
+      : '<div class="ad-note">還沒有成績</div>'
+  } else if (view === 'presence') {
+    adminBody.innerHTML =
+      `<div class="ad-stat"><span>近 1 小時進場裝置</span><b>${j.n1h}</b></div>` +
+      `<div class="ad-stat"><span>近 24 小時進場裝置</span><b>${j.n24}</b></div>` +
+      `<div class="ad-note">— 最新進場的 deviceId（一排亂碼＝灌人數攻擊）—</div>` +
+      (j.rows || []).map((r) => `<div class="ad-row"><span class="ad-ip">${escapeHtml(r.device_id)}</span><span class="ad-when">${t(r.last_seen)}</span></div>`).join('')
+  }
+}
+let adminLoading = false
+async function loadAdminView(view) {
+  if (adminLoading) return
+  adminLoading = true
+  setAdminTab(view)
+  adminBody.innerHTML = '<div class="ad-note">查詢中…</div>'
+  try {
+    const j = await fetchAdmin(view)
+    if (j.ok) renderAdmin(view, j)
+    else if (j.status === 429) adminBody.innerHTML = '<div class="ad-note">⏳ 查詢限流中（同 IP 每 5 秒一次），稍候再點一次分頁</div>'
+    else { adminShowAuth(); document.getElementById('admin-err').textContent = '驗證失效，請重新輸入密碼' }
+  } catch { adminBody.innerHTML = '<div class="ad-note">連線失敗（管理面板需線上版）</div>' }
+  adminLoading = false
+}
+adminTabsEl.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-k]')
+  if (b) loadAdminView(b.dataset.k)
+})
+async function adminLogin() {
+  const input = document.getElementById('admin-key')
+  const err = document.getElementById('admin-err')
+  adminKey = input.value.trim()
+  if (!adminKey) return
+  err.textContent = '驗證中…'
+  let j = {}
+  try { j = await fetchAdmin('overview') } catch {}
+  if (j.ok) {
+    try { sessionStorage.setItem('angrybb:adminkey', adminKey) } catch {}
+    err.textContent = ''; input.value = ''
+    adminShowPanel(); setAdminTab('overview'); renderAdmin('overview', j)
+  } else if (j.status === 429) {
+    err.textContent = '嘗試太頻繁，請等 5 秒再試'
+    adminKey = ''
+  } else {
+    err.textContent = '密碼錯誤'
+    adminKey = ''
+  }
+}
+document.getElementById('admin-login').addEventListener('click', adminLogin)
+document.getElementById('admin-key').addEventListener('keydown', (e) => { if (e.key === 'Enter') adminLogin() })
+document.getElementById('admin-btn-landing').addEventListener('click', () => {
+  adminModal.classList.remove('hidden')
+  if (adminKey) { adminShowPanel(); loadAdminView('overview') }
+  else { adminShowAuth(); document.getElementById('admin-key').focus() }
 })
 // ---- Debug 選單（測試用）----
 function renderDebug() {

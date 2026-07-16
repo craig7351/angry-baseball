@@ -1,4 +1,4 @@
-import { json, sanitizeText, clampInt, clientIp, rateLimited, isBadText } from './_lib.js'
+import { json, sanitizeText, clampInt, clientIp, rateLimited, isBadText, audit } from './_lib.js'
 
 // GET /api/messages — 最新 120 則留言（含回覆，前端依 parentId 組串）
 export const onRequestGet = async ({ env }) => {
@@ -22,7 +22,10 @@ export const onRequestPost = async ({ request, env }) => {
     const name = sanitizeText(body.name, 12) || '匿名'
     const text = sanitizeText(body.text, 120)
     if (!text) return json({ ok: false, error: 'empty' }, 400)
-    if (isBadText(text) || isBadText(name)) return json({ ok: false, error: 'blocked' }, 422)
+    if (isBadText(text) || isBadText(name)) {
+      await audit(env, 'msg-blocked', clientIp(request), `${name}: ${text.slice(0, 60)}`)
+      return json({ ok: false, error: 'blocked' }, 422)
+    }
     const device = sanitizeText(body.deviceId, 64)
     const parentId = body.parentId != null ? clampInt(body.parentId, 1, 2_000_000_000) : null
     await env.DB.prepare('INSERT INTO messages (name, text, device_id, created_at, parent_id) VALUES (?, ?, ?, ?, ?)')
@@ -34,11 +37,18 @@ export const onRequestPost = async ({ request, env }) => {
 }
 
 // DELETE /api/messages — 版主刪除（需正確 key；連同回覆一起刪）。未設 ADMIN_KEY 則停用
+// 限流放在驗證之前：同 IP 每 5 秒最多一次，同時擋住暴力枚舉密碼
 export const onRequestDelete = async ({ request, env }) => {
   try {
+    if (await rateLimited(env, `del:${clientIp(request)}`, 5000)) {
+      return json({ ok: false, error: 'too fast' }, 429)
+    }
     const body = await request.json().catch(() => ({}))
     if (!env.ADMIN_KEY) return json({ ok: false, error: 'disabled' }, 403)
-    if (!body.key || body.key !== env.ADMIN_KEY) return json({ ok: false, error: 'forbidden' }, 403)
+    if (!body.key || body.key !== env.ADMIN_KEY) {
+      await audit(env, 'del-forbidden', clientIp(request))
+      return json({ ok: false, error: 'forbidden' }, 403)
+    }
     const id = clampInt(body.id, 1, 2_000_000_000)
     await env.DB.prepare('DELETE FROM messages WHERE id=? OR parent_id=?').bind(id, id).run()
     return json({ ok: true })

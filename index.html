@@ -322,6 +322,24 @@
     .debug-wallet b { color: #f4a53a; font-size: 20px; }
     #debug-coins { align-self: center; background: #f4b93a; color: #5a3d10; }
     #debug-coins:hover { background: #ffca52; }
+    /* 管理面板 */
+    #admin-key { font-size: 15px; font-weight: 700; padding: 9px 12px; border: 2px solid #e6e6ee;
+      border-radius: 10px; outline: none; text-align: center; color: #222; }
+    #admin-key:focus { border-color: #e0533b; }
+    #admin-login { align-self: center; }
+    #admin-err { text-align: center; color: #d24a2a; font-weight: 800; font-size: 13px; min-height: 16px; }
+    #admin-panel.hidden { display: none; }
+    #admin-auth.hidden { display: none; }
+    #admin-body { overflow-y: auto; padding: 6px 16px 18px; min-height: 120px; }
+    .ad-stat { display: flex; justify-content: space-between; padding: 7px 6px; border-bottom: 1px solid #f2f2f5; font-size: 14px; color: #444; }
+    .ad-stat b { color: #e0533b; }
+    .ad-row { padding: 7px 6px; border-bottom: 1px solid #f2f2f5; font-size: 13px; text-align: left; color: #333; }
+    .ad-kind { display: inline-block; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 1px 8px;
+      background: #ffe9e4; color: #c0392b; margin-right: 6px; }
+    .ad-ip { font-family: monospace; color: #666; font-size: 12px; }
+    .ad-when { color: #aaa; font-size: 11px; margin-left: 6px; }
+    .ad-detail { color: #333; margin-top: 2px; word-break: break-all; }
+    .ad-note { text-align: center; color: #999; font-size: 12px; padding: 10px; }
 
     /* 新手動態提示 */
     #hint { position: fixed; left: 50%; bottom: 24%; transform: translate(-50%, 8px); z-index: 6;
@@ -445,6 +463,7 @@
         <button id="online-btn-landing" class="ghost"><span class="ico">📈</span>上線</button>
         <button id="settings-btn-landing" class="ghost"><span class="ico">⚙️</span>設定</button>
         <button id="music-toggle" class="ghost"><span class="ico">🔊</span>音樂</button>
+        <button id="admin-btn-landing" class="ghost"><span class="ico">🔒</span>管理</button>
       </div>
       <div class="landing-stat">全服累計　🎮 <b id="total-plays">–</b> 場　💥 <b id="total-kills">–</b> 轟　⏱ <b id="total-time">–</b></div>
       <p class="tip">名字存在這台裝置，並記錄你的最高分與金幣</p>
@@ -516,6 +535,22 @@
     <div class="lb-card">
       <div class="lb-head"><span>📈 上線人數</span><button class="mclose" data-close="online-modal">✕</button></div>
       <div id="online-body"></div>
+    </div>
+  </div>
+
+  <!-- 管理面板（需管理密碼；純唯讀的攻擊分析儀表板） -->
+  <div id="admin-modal" class="modal hidden">
+    <div class="lb-card">
+      <div class="lb-head"><span>🔒 管理面板</span><button class="mclose" data-close="admin-modal">✕</button></div>
+      <div id="admin-auth" class="set-body">
+        <input id="admin-key" type="password" placeholder="輸入管理密碼" autocomplete="off" />
+        <button id="admin-login">進入</button>
+        <div id="admin-err"></div>
+      </div>
+      <div id="admin-panel" class="hidden">
+        <div class="lb-tabs" id="admin-tabs"></div>
+        <div id="admin-body"></div>
+      </div>
     </div>
   </div>
 
