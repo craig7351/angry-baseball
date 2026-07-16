@@ -163,26 +163,44 @@
     #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
       background: #1d4a2c; color: #fff; font-size: 16px; z-index: 20; }
 
-    /* ===== 首頁（夜間球場燈光風）===== */
-    #landing { position: fixed; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center;
-      overflow: hidden;
-      background: radial-gradient(ellipse at 50% 118%, #3f8a4f 0%, #2b6b3d 24%, #17452a 46%, #0d2b1c 68%, #081a12 100%); }
+    /* ===== 首頁（球場實景 + 左側選單，參考 mockup）===== */
+    #landing { position: fixed; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: flex-start;
+      padding-left: 6vw; overflow: hidden;
+      background: #17452a url(assets/ui/landing-bg.webp) right center / cover no-repeat; }
     #landing.hidden { display: none; }
-    #landing::before { content: ''; position: absolute; left: 50%; bottom: -26vh; width: 130vmin; height: 66vmin;
-      transform: translateX(-50%); border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+    #landing::before { content: ''; position: absolute; inset: 0; pointer-events: none;
       background:
-        linear-gradient(transparent 62%, rgba(255,255,255,.09) 62.5%, transparent 63%),
-        conic-gradient(from 225deg at 50% 100%, transparent 0 12deg, rgba(255,255,255,.06) 12deg 13deg, transparent 13deg 44deg, rgba(255,255,255,.06) 44deg 45deg, transparent 45deg 77deg, rgba(255,255,255,.06) 77deg 78deg, transparent 78deg 90deg);
-      pointer-events: none; }
-    .land-panel { position: relative; z-index: 2; width: min(90vw, 430px); max-height: 96vh; overflow: visible;
-      background: #14351f; border: 5px solid #2e6b40; border-radius: 26px;
-      box-shadow: 0 0 0 4px #0d2314, 0 26px 60px rgba(0,0,0,.55);
-      padding: 24px 34px 18px; display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+        linear-gradient(90deg, rgba(8,26,18,.93) 0%, rgba(8,26,18,.8) 28%, rgba(8,26,18,.3) 58%, rgba(8,26,18,.02) 100%),
+        linear-gradient(0deg, rgba(8,26,18,.8) 0%, transparent 22%); }
+    @media (max-width: 860px) {
+      #landing { justify-content: center; padding-left: 0; }
+      #landing::before { background: rgba(8,26,18,.62); }
+    }
+    .land-panel { position: relative; z-index: 2; width: min(90vw, 420px); max-height: 96vh; overflow: visible;
+      background: rgba(14,42,24,.82); border: 4px solid rgba(46,107,64,.9); border-radius: 26px;
+      box-shadow: 0 0 0 3px rgba(13,35,20,.7), 0 26px 60px rgba(0,0,0,.55);
+      backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+      padding: 14px 30px 16px; display: flex; flex-direction: column; align-items: stretch; gap: 8px;
       color: #d7e8dc; text-align: center; }
-    .land-title { font-size: clamp(30px, 6vw, 40px); font-weight: 900; letter-spacing: 2px; line-height: 1.15;
-      background: linear-gradient(180deg, #ffe27a, #ff8a2f); -webkit-background-clip: text; background-clip: text; color: transparent;
-      filter: drop-shadow(0 4px 8px rgba(0,0,0,.45)); }
-    .land-sub { font-size: 12px; font-weight: 800; color: #9fc4aa; letter-spacing: 3px; margin-top: -4px; }
+    .land-logo { display: block; width: 92%; max-width: 380px; margin: -78px auto -4px; pointer-events: none;
+      filter: drop-shadow(0 8px 14px rgba(0,0,0,.5)); }
+    @media (max-height: 640px) { .land-logo { margin-top: -40px; width: 70%; } }
+    /* 快速入口（輸入名字後直接開打） */
+    .quick-row { display: flex; gap: 8px; }
+    .quick-btn { flex: 1; border: none; border-radius: 12px; color: #fff; cursor: pointer; font-weight: 900;
+      font-size: 15px; padding: 10px 4px; line-height: 1.2; box-shadow: 0 4px 0 rgba(0,0,0,.3);
+      background: linear-gradient(#2f9450, #1d6334); transition: transform .1s, filter .1s; }
+    #quick-survival { background: linear-gradient(#e85466, #c11f2b); }
+    .quick-btn:hover:not(:disabled) { filter: brightness(1.08); }
+    .quick-btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.3); }
+    .quick-btn:disabled { background: #46604e; box-shadow: none; cursor: not-allowed; opacity: .7; }
+    /* 底部資訊條（跑馬燈訊息 + 線上人數 + 全服累計） */
+    #land-footer { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+      display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 22px;
+      padding: 8px 18px; background: rgba(0,0,0,.48); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+      color: #cfe4d6; font-size: 12px; font-weight: 700; }
+    .lf-msg { color: #ffe27a; }
+    .lf-ver { color: #7fa58c; }
     #online-badge { align-self: center; display: inline-flex; align-items: center; gap: 6px;
       font-size: 13px; font-weight: 800; color: #6fe08a; background: rgba(20,60,35,.9); border-radius: 999px; padding: 4px 12px; }
     #online-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #34c759;
@@ -446,15 +464,17 @@
     </div>
   </div>
 
-  <!-- 登入頁 -->
+  <!-- 登入頁（球場實景 + 左側選單） -->
   <div id="landing" class="hidden">
     <div class="land-panel">
-      <div class="land-title">⚾ 憤怒棒球</div>
-      <div class="land-sub">ANGRY BASEBALL</div>
-      <div id="online-badge"><span class="dot"></span> 線上 <b id="online-n">–</b> 人</div>
+      <img class="land-logo" src="assets/ui/logo.webp" alt="⚾ 憤怒棒球 ANGRY BASEBALL" />
       <div class="land-name-label">打者名稱</div>
       <input id="name-input" maxlength="12" placeholder="輸入你的名字" autocomplete="off" />
       <button id="start-btn" disabled><span class="big">▶ 進場打擊</span><small>大賽 · 生存 · 投手挑戰</small></button>
+      <div class="quick-row">
+        <button id="quick-derby" class="quick-btn" disabled>⚾ 全壘打大賽</button>
+        <button id="quick-survival" class="quick-btn" disabled>🔥 生存連打</button>
+      </div>
       <p id="name-hint">請先輸入名字才能開始</p>
       <div class="landing-btns">
         <button id="shop-btn-landing" class="ghost"><span class="ico">🛒</span>商店</button>
@@ -465,8 +485,13 @@
         <button id="music-toggle" class="ghost"><span class="ico">🔊</span>音樂</button>
         <button id="admin-btn-landing" class="ghost"><span class="ico">🔒</span>管理</button>
       </div>
-      <div class="landing-stat">全服累計　🎮 <b id="total-plays">–</b> 場　💥 <b id="total-kills">–</b> 轟　⏱ <b id="total-time">–</b></div>
       <p class="tip">名字存在這台裝置，並記錄你的最高分與金幣</p>
+    </div>
+    <div id="land-footer">
+      <span class="lf-msg">📢 歡迎來到憤怒棒球！享受打擊的快感！</span>
+      <span id="online-badge"><span class="dot"></span> 線上 <b id="online-n">–</b> 人</span>
+      <span class="landing-stat">全服累計　🎮 <b id="total-plays">–</b> 場　💥 <b id="total-kills">–</b> 轟　⏱ <b id="total-time">–</b></span>
+      <span class="lf-ver">v1.0</span>
     </div>
   </div>
 

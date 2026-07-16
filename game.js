@@ -1158,9 +1158,23 @@ const lbModal = document.getElementById('lb-modal')
 function refreshStartBtn() {
   const ok = nameInput.value.trim().length > 0
   startBtn.disabled = !ok
+  for (const id of ['quick-derby', 'quick-survival']) {
+    const b = document.getElementById(id); if (b) b.disabled = !ok
+  }
   document.getElementById('name-hint').style.visibility = ok ? 'hidden' : 'visible'
   if (ok) setPlayerName(nameInput.value)
 }
+// 首頁快速入口：輸入名字後直接開打（不經模式選單）
+document.getElementById('quick-derby').addEventListener('click', () => {
+  if (nameInput.value.trim().length === 0) return
+  setPlayerName(nameInput.value)
+  startDerby()
+})
+document.getElementById('quick-survival').addEventListener('click', () => {
+  if (nameInput.value.trim().length === 0) return
+  setPlayerName(nameInput.value)
+  startSurvival()
+})
 function showLanding() {
   exitLock()
   hud.msg.classList.add('hidden')
