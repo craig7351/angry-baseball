@@ -25,6 +25,14 @@ for src, dst in MAP.items():
     im.save(p, "WEBP", quality=82, method=6)
     print(dst, im.size, round(os.path.getsize(p) / 1024), "KB")
 
+# Hero 背景：乾淨的插畫球場（白天空留白給 LOGO/CTA）
+hero = Image.open(os.path.join(SRC, "df68a3a1-707f-4ccd-98b1-876cfe6114c6.png")).convert("RGB")
+if hero.width > 1680:
+    hero = hero.resize((1680, round(hero.height * 1680 / hero.width)), Image.LANCZOS)
+p = os.path.join(OUT, "hero-field.webp")
+hero.save(p, "WEBP", quality=84, method=6)
+print("hero-field.webp", hero.size, round(os.path.getsize(p) / 1024), "KB")
+
 # LOGO 直接沿用遊戲內的去背版
 shutil.copy(os.path.join(ROOT, "public", "assets", "ui", "logo.webp"), os.path.join(OUT, "logo.webp"))
 print("logo.webp copied")
