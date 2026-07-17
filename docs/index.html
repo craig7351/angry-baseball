@@ -23,10 +23,13 @@
     .hero-bg { position: absolute; inset: 0; background: url(img/hero-field.webp) center bottom / cover no-repeat; }
     .hero::before { content: ''; position: absolute; inset: 0;
       background: linear-gradient(rgba(255,255,255,0) 72%, rgba(13,43,28,.25) 88%, #0d2b1c 100%); }
-    .hero-inner { position: relative; z-index: 1; padding: 7vh 20px 60px; }
-    .hero-logo { width: min(76vw, 460px); margin: 0 auto 6px; filter: drop-shadow(0 10px 18px rgba(30,60,40,.35)); }
-    .hero h1 { font-size: clamp(19px, 3.4vw, 27px); color: #1d4a2c; font-weight: 900; text-shadow: 0 2px 0 rgba(255,255,255,.7); }
-    .hero p.sub { font-size: clamp(14px, 2.2vw, 17px); color: #4a6a54; font-weight: 700; margin: 8px 0 26px; }
+    .hero-inner { position: relative; z-index: 1; margin: 6vh 20px 60px; padding: 10px 34px 30px;
+      max-width: 760px; border-radius: 28px;
+      background: rgba(255,255,255,.72); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 20px 50px rgba(30,60,40,.18); }
+    .hero-logo { width: min(70vw, 440px); margin: -4px auto 4px; filter: drop-shadow(0 10px 18px rgba(30,60,40,.35)); }
+    .hero h1 { font-size: clamp(19px, 3.4vw, 27px); color: #14351f; font-weight: 900; }
+    .hero p.sub { font-size: clamp(14px, 2.2vw, 17px); color: #3a5a44; font-weight: 700; margin: 8px 0 26px; }
     .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
     .btn { display: inline-block; text-decoration: none; font-weight: 900; border-radius: 16px;
       padding: 15px 38px; font-size: 19px; transition: transform .1s, filter .1s;
