@@ -1289,9 +1289,8 @@ for (const btn of document.querySelectorAll('.mclose[data-close]')) {
 }
 const settingsModal = document.getElementById('settings-modal')
 const onlineModal = document.getElementById('online-modal')
-const debugModal = document.getElementById('debug-modal')
 const adminModal = document.getElementById('admin-modal')
-for (const m of [msgModal, onlineModal, shopModal, settingsModal, debugModal, adminModal]) m.addEventListener('click', (e) => {
+for (const m of [msgModal, onlineModal, shopModal, settingsModal, adminModal]) m.addEventListener('click', (e) => {
   if (e.target === m) m.classList.add('hidden')
 })
 // ============================================================
@@ -1303,6 +1302,7 @@ const ADMIN_TABS = [
   { k: 'rate', label: '🔥 限流排行' },
   { k: 'scores', label: '⚾ 最新成績' },
   { k: 'presence', label: '👥 進場裝置' },
+  { k: 'debug', label: '🐞 Debug' },
 ]
 const KIND_LABEL = {
   'admin-forbidden': '管理密碼錯誤', 'del-forbidden': '刪除密碼錯誤',
@@ -1370,6 +1370,20 @@ function renderAdmin(view, j) {
 }
 let adminLoading = false
 async function loadAdminView(view) {
+  if (view === 'debug') {   // Debug 工具：純本機操作，不打後端、不吃查詢限流
+    setAdminTab(view)
+    adminBody.innerHTML =
+      `<div class="ad-stat"><span>💰 目前金幣</span><b id="dbg-wallet">${wallet.toLocaleString()}</b></div>` +
+      `<div style="text-align:center;padding:14px"><button id="dbg-coins">💰 領取 10,000 金幣</button></div>` +
+      `<div class="ad-note">Debug 工具只影響本機存檔（localStorage）</div>`
+    document.getElementById('dbg-coins').addEventListener('click', () => {
+      wallet += 10000; saveWallet()
+      sfx.coin()
+      document.getElementById('dbg-wallet').textContent = wallet.toLocaleString()
+      refreshHUD()
+    })
+    return
+  }
   if (adminLoading) return
   adminLoading = true
   setAdminTab(view)
@@ -1412,17 +1426,6 @@ document.getElementById('admin-btn-landing').addEventListener('click', () => {
   adminModal.classList.remove('hidden')
   if (adminKey) { adminShowPanel(); loadAdminView('overview') }
   else { adminShowAuth(); document.getElementById('admin-key').focus() }
-})
-// ---- Debug 選單（測試用）----
-function renderDebug() {
-  const el = document.getElementById('debug-wallet')
-  if (el) el.textContent = wallet.toLocaleString()
-}
-document.getElementById('debug-open').addEventListener('click', () => { renderDebug(); debugModal.classList.remove('hidden') })
-document.getElementById('debug-coins').addEventListener('click', () => {
-  wallet += 10000; saveWallet()
-  sfx.coin()
-  renderDebug(); refreshHUD()
 })
 // 設定選單
 const setSens = document.getElementById('set-sens'), setSensV = document.getElementById('set-sens-v')
