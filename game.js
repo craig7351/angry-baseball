@@ -725,8 +725,12 @@ function endGame() {
   removeBall()
   game.ballcam = false
   restoreCam()
-  // 最遠紀錄送「最遠」榜（公尺 ×10）
-  if (game.maxDist > 0) submitScore(Math.round(game.maxDist * 10), FAR_KEY, modeLabel())
+  // 最遠紀錄送「最遠」榜（公尺 ×10）：延遲 3.5 秒送，
+  // 錯開主榜（showLevelRank）的送分，避免同 IP 撞 /api/score 的 3 秒限流讓其中一筆掉榜
+  if (game.maxDist > 0) {
+    const farScore = Math.round(game.maxDist * 10), farNote = modeLabel()
+    setTimeout(() => submitScore(farScore, FAR_KEY, farNote), 3500)
+  }
   const summary = `得分 ${game.score.toLocaleString()}　💥 全壘打 ×${game.hrs}　🚀 最遠 ${game.maxDist.toFixed(1)}m　💰 +${(game.coinsEarned || 0).toLocaleString()}`
   hud.stars.innerHTML = ''
   if (game.mode === 'level') {
